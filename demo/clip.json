@@ -1,0 +1,17 @@
+{
+  "seconds": 7,
+  "selector": "#app",
+  "steps": [
+    { "wait": 500 },
+    { "tap": "button.cta" },
+    { "wait": 300 },
+    { "start": true },
+    { "wait": 500 },
+    { "tap": ".bet:nth-child(3)" },
+    { "wait": 900 },
+    { "tap": "button.cta" },
+    { "wait": 1100 },
+    { "tap": "button.hit" },
+    { "wait": 1500 }
+  ]
+}
