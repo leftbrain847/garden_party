@@ -215,3 +215,4 @@ textarea.field { resize: vertical; min-height: 76px; line-height: 1.4; }
 .tab.on { color: var(--ink); background: #1f3a2d; }
 .side-shed .tab.on { background: #2e3658; }
 .side-shed .row { background: linear-gradient(180deg, #2e3658, #222944); box-shadow: 0 5px 0 #11152a, 0 10px 16px rgba(0, 0, 0, 0.3); }
+.small-ghost { min-height: 44px; font-size: 14px; }

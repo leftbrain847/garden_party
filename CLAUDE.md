@@ -44,7 +44,7 @@ An app built on app_builder. The platform rules live in `platform/SPEC.md`: read
 ## App-specific notes
 
 - **Two sides, never mixed:** Garden is review only (island → water all / one bed → bet → flip → got it / missed). Shed is deck management only (decks, cards, add/edit). Only the tab bar links them.
-- **The bet replaces self-grading:** 1–3 seeds before the flip, then got it / missed. No Again/Hard/Good/Easy buttons; never show intervals.
+- **The bet replaces self-grading:** 1–3 seeds before the flip, then got it / missed. No Again/Hard/Good/Easy buttons; never show intervals. Every miss comes back the same day; the bet only sets how much interval it keeps (a confident miss keeps the least).
 - **Look: direction A, isometric diorama.** Gnome crew: Pip (head gardener, Garden), Moss (waterer, review), Quill (scribe, Shed), plus background chore gnomes (CSS animation, off under reduce-motion).
 - **On-device only:** the garden lives in localStorage. No network, no accounts.
 - **Transcription without a dependency:** photos are downscaled to data: URLs; text comes from the OS (iOS Live Text "Scan Text" in the text field) or Chrome's experimental `TextDetector` when present. Tesseract is a possible follow-up for the friends and Play builds only, and needs J's OK as a new dependency.

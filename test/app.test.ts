@@ -35,13 +35,14 @@ describe('watering with a bet', () => {
     expect(i1).toBeGreaterThan(10);
   });
 
-  it('a confident miss resets the card to today; a hunch miss only shrinks it', () => {
+  it('every miss comes back today; a hunch miss keeps more of its interval than a confident one', () => {
     const base = srs({ interval: 10, ease: 2.3 });
     const lock = water(base, { bet: 3, right: false }, T).srs;
     const hunch = water(base, { bet: 1, right: false }, T).srs;
     expect(lock.interval).toBe(0);
     expect(lock.due).toBe(T);
     expect(hunch.interval).toBe(5);
+    expect(hunch.due).toBe(T);
     expect(lock.ease).toBeLessThan(hunch.ease);
     expect(lock.lapses).toBe(1);
   });

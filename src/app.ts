@@ -21,7 +21,7 @@ export interface Rules {
   firstInterval: Record<Bet, number>;
   /** Interval multiplier on a correct answer, by bet (applied on top of ease). */
   rightGrowth: Record<Bet, number>;
-  /** Interval multiplier on a wrong answer, by bet. A confident miss shrinks the interval the most. */
+  /** On a miss the card comes back today; this is how much of its interval it keeps for the next right answer, by bet. A confident miss keeps the least. */
   wrongShrink: Record<Bet, number>;
   /** Ease change on a correct / wrong answer, by bet. */
   rightEase: Record<Bet, number>;
@@ -147,9 +147,9 @@ export function water(srs: Srs, ans: Answer, today: number, rules: Rules = DEFAU
     interval = Math.floor(srs.interval * rules.wrongShrink[ans.bet]);
   }
   interval = clamp(interval, 0, rules.maxIntervalDays);
-  // A miss comes back today (interval 0); anything else waits its interval.
+  // A miss always comes back today; the kept interval only shapes how far it jumps once it's right again.
   const next: Srs = {
-    due: today + interval,
+    due: ans.right ? today + interval : today,
     interval,
     ease: Math.round(ease * 100) / 100,
     reps: srs.reps + 1,
@@ -157,7 +157,7 @@ export function water(srs: Srs, ans: Answer, today: number, rules: Rules = DEFAU
   };
   const seeds = (ans.right ? 1 : -1) * ans.bet * rules.seedsPerBet;
   // Watered today: a fresh miss is still thirsty, a hit is healthy or blooming.
-  return { srs: next, seeds, before, after: health(next, today + (interval === 0 ? 0 : 1)) };
+  return { srs: next, seeds, before, after: health(next, ans.right ? today + 1 : today) };
 }
 
 // ---------- the solo run: one watering session ----------

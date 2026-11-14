@@ -59,7 +59,7 @@ type Screen =
   | { name: 'done'; right: number; total: number; seeds: number; deckId?: string }
   | { name: 'shed' }
   | { name: 'deck'; deckId: string; confirmDelete?: boolean }
-  | { name: 'card'; deckId: string; cardId?: string; draft: Draft; note: string };
+  | { name: 'card'; deckId: string; cardId?: string; draft: Draft; note: string; confirmDelete?: boolean };
 
 interface Draft {
   front: Face;
@@ -154,7 +154,7 @@ function bedScreen(deckId: string): Kid[] {
   const cards = cardsIn(deckId);
   const due = queue(cards, day);
   return [
-    top('', deckName(deckId), `${cards.length} plants · ${healthLine(cards)}`, { label: 'Garden', to: { name: 'garden' } }),
+    top('', deckName(deckId), [`${cards.length} plants`, healthLine(cards)].filter(Boolean).join(' · '), { label: 'Garden', to: { name: 'garden' } }),
     h(
       'div',
       { cls: 'plants' },
@@ -189,10 +189,11 @@ function reviewScreen(r: Extract<Screen, { name: 'review' }>): Kid[] {
     const day = today();
     const out = water(card.srs, { bet: r.bet, right }, day);
     card.srs = out.srs;
+    const bank = garden.seeds;
     garden.seeds = Math.max(0, garden.seeds + out.seeds);
     commit();
     const line = right ? LINES.mossRight(r.bet) : LINES.mossWrong(r.bet);
-    const next = { ...r, at: r.at + 1, bet: null, flipped: false, right: r.right + (right ? 1 : 0), seeds: r.seeds + out.seeds, line };
+    const next = { ...r, at: r.at + 1, bet: null, flipped: false, right: r.right + (right ? 1 : 0), seeds: r.seeds + (garden.seeds - bank), line };
     if (next.at >= next.ids.length) go({ name: 'done', right: next.right, total: next.ids.length, seeds: next.seeds, deckId: r.deckId });
     else go(next);
   };
@@ -353,7 +354,7 @@ function sideEditor(c: Extract<Screen, { name: 'card' }>, side: 'front' | 'back'
   area.addEventListener('input', () => {
     face.text = area.value;
   });
-  const file = h('input', { cls: 'hidden-file', attrs: { type: 'file', accept: 'image/*', capture: 'environment', 'aria-label': `Photo for the ${side}` } });
+  const file = h('input', { cls: 'hidden-file', attrs: { type: 'file', accept: 'image/*', 'aria-label': `Photo for the ${side}` } });
   file.addEventListener('change', () => {
     const f = file.files?.[0];
     if (!f) return;
@@ -362,10 +363,15 @@ function sideEditor(c: Extract<Screen, { name: 'card' }>, side: 'front' | 'back'
         face.photo = url;
         const auto = await autoRead(url);
         if (auto && !face.text) face.text = auto;
-        if (side === 'front') c.draft.show = 'photo';
-        go({ ...c, note: auto ? LINES.quillAuto : LINES.quillScan });
+        // Only redraw if the player is still editing this card; faces are shared between draft copies, so their other edits stay.
+        if (screen.name === 'card' && screen.draft[side] === face) {
+          if (side === 'front') screen.draft.show = 'photo';
+          go({ ...screen, note: auto ? LINES.quillAuto : LINES.quillScan });
+        }
       })
-      .catch(() => go({ ...c, note: 'Quill couldn\'t open that photo. Try another one.' }));
+      .catch(() => {
+        if (screen.name === 'card' && screen.draft[side] === face) go({ ...screen, note: 'Quill couldn\'t open that photo. Try another one.' });
+      });
   });
   return h('section', { cls: 'side' }, [
     h('div', { cls: 'side-head' }, [
@@ -378,6 +384,7 @@ function sideEditor(c: Extract<Screen, { name: 'card' }>, side: 'front' | 'back'
     mode === 'snap'
       ? h('div', { cls: 'snap' }, [
           face.photo ? h('img', { cls: 'photo', attrs: { src: face.photo, alt: `Photo for the ${side}` } }) : h('div', { cls: 'photo-empty', text: 'No photo yet' }),
+          face.photo ? button('Remove photo', 'ghost small-ghost', () => { delete face.photo; if (side === 'front') c.draft.show = 'text'; go({ ...c }); }) : null,
           h('label', { cls: 'snap-btn', attrs: { role: 'button', tabindex: '0' }, on: { keydown: (e) => { if ((e as KeyboardEvent).key === 'Enter' || (e as KeyboardEvent).key === ' ') { e.preventDefault(); file.click(); } } } }, [cameraIcon(), face.photo ? 'Retake photo' : 'Take photo', file]),
         ])
       : null,
@@ -421,7 +428,11 @@ function cardScreen(c: Extract<Screen, { name: 'card' }>): Kid[] {
     sideEditor(c, 'front'),
     sideEditor(c, 'back'),
     h('div', { cls: 'verdict' }, [button('Cancel', 'ghost', () => go({ name: 'deck', deckId: c.deckId })), button('Save card', 'build', saveCard)]),
-    c.cardId ? button('Delete card', 'ghost danger', remove) : null,
+    c.cardId
+      ? c.confirmDelete
+        ? h('div', { cls: 'verdict' }, [button('Keep it', 'ghost', () => go({ ...c, confirmDelete: false })), button('Delete card', 'miss', remove)])
+        : button('Delete card', 'ghost danger', () => go({ ...c, confirmDelete: true }))
+      : null,
   ];
 }
 
