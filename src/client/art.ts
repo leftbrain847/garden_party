@@ -73,20 +73,79 @@ function box(x0: number, y0: number, z0: number, w: number, d: number, h: number
   ]);
 }
 
-function isoPlant(defs: SVGDefsElement, x: number, y: number, z: number, h: Health): SVGGElement {
+/** Flower colors for blooming plants; each card keeps its own color, picked from its id. */
+export const PETALS: [string, string][] = [
+  ['#FFD3E3', '#E98DB0'], // pink
+  ['#E7D2FF', '#A983E0'], // violet
+  ['#FFD9C2', '#F08A5D'], // coral
+  ['#FFF6D8', '#F2C94C'], // buttercup
+  ['#FFFFFF', '#D9D2E8'], // white
+];
+
+const hash = (id: string): number => {
+  let n = 0;
+  for (let i = 0; i < id.length; i++) n = (n * 31 + id.charCodeAt(i)) >>> 0;
+  return n;
+};
+
+function leaf(x: number, y: number, len: number, angle: number, fill: string): SVGPathElement {
+  // A pointed leaf drawn along +x, then rotated into place.
+  return s('path', { d: `M0 0 Q${len * 0.5} ${-len * 0.42} ${len} 0 Q${len * 0.5} ${len * 0.42} 0 0Z`, fill, transform: `translate(${x.toFixed(1)},${y.toFixed(1)}) rotate(${angle})` });
+}
+
+function flowerHead(cx: number, cy: number, r: number, colors: [string, string], tilt = 0, petals = 5): SVGGElement {
+  const kids: SVGElement[] = [];
+  for (let i = 0; i < petals; i++) {
+    const a = (360 / petals) * i;
+    kids.push(s('ellipse', { cx: 0, cy: -r * 0.62, rx: r * 0.42, ry: r * 0.62, fill: colors[0], stroke: colors[1], 'stroke-width': 0.6, transform: `rotate(${a})` }));
+  }
+  kids.push(s('circle', { cx: 0, cy: 0, r: r * 0.36, fill: '#F7D04A' }), s('circle', { cx: -r * 0.1, cy: -r * 0.1, r: r * 0.14, fill: '#FFF1A8' }));
+  return s('g', { transform: `translate(${cx.toFixed(1)},${cy.toFixed(1)}) rotate(${tilt}) scale(1,0.85)` }, kids);
+}
+
+function isoPlant(x: number, y: number, z: number, h: Health, id: string): SVGGElement {
   const [bx, by] = P(x, y, z);
-  const height = h === 'wilted' ? 5 : h === 'thirsty' ? 11 : 15;
-  const r = h === 'bloom' ? 6 : h === 'wilted' ? 3.5 : 5;
-  const lean = h === 'thirsty' ? 4 : h === 'wilted' ? 6 : 0;
-  const tx = bx + lean;
-  const ty = by - height;
-  const g = radial(PLANT_COLORS[h].light, PLANT_COLORS[h].dark);
-  defs.appendChild(g.def);
-  return s('g', { class: `plant plant-${h}` }, [
-    s('ellipse', { cx: bx, cy: by, rx: 4, ry: 2, fill: 'rgba(0,0,0,.3)' }),
-    s('path', { d: `M${bx} ${by} Q${bx} ${ty + 4} ${tx} ${ty + r * 0.6}`, stroke: EARTH.stem, 'stroke-width': 1.6, fill: 'none' }),
-    s('circle', { cx: tx, cy: ty, r, fill: g.url }),
-  ]);
+  const green = '#4FA35B';
+  const greenLight = '#7FCB88';
+  const kids: SVGElement[] = [s('ellipse', { cx: bx, cy: by, rx: 4.5, ry: 2, fill: 'rgba(0,0,0,.32)' })];
+  if (h === 'bloom') {
+    const top = by - 17;
+    kids.push(
+      s('path', { d: `M${bx} ${by} Q${bx - 1.5} ${by - 9} ${bx} ${top}`, stroke: EARTH.stem, 'stroke-width': 1.6, fill: 'none' }),
+      leaf(bx, by - 5, 6.5, -150, green),
+      leaf(bx, by - 8, 6, -30, greenLight),
+      flowerHead(bx, top, 5.4, PETALS[hash(id) % PETALS.length] ?? ['#FFD3E3', '#E98DB0']),
+    );
+  } else if (h === 'ok') {
+    const top = by - 14;
+    kids.push(
+      s('path', { d: `M${bx} ${by} L${bx} ${top}`, stroke: EARTH.stem, 'stroke-width': 1.6 }),
+      leaf(bx, by - 4, 6, -155, green),
+      leaf(bx, by - 7, 6.5, -25, greenLight),
+      leaf(bx, by - 10, 5, -140, greenLight),
+      // a closed bud: this one will flower once it's watered a few more times
+      s('path', { d: `M${bx - 2.2} ${top + 1} Q${bx} ${top - 6} ${bx + 2.2} ${top + 1}Z`, fill: '#9BD38E', stroke: '#3F8A4A', 'stroke-width': 0.5 }),
+      s('path', { d: `M${bx - 0.8} ${top - 2.5} Q${bx} ${top - 4.8} ${bx + 0.8} ${top - 2.5}`, stroke: (PETALS[hash(id) % PETALS.length] ?? ['#FFD3E3', '#E98DB0'])[1], 'stroke-width': 1.2, fill: 'none' }),
+    );
+  } else if (h === 'thirsty') {
+    const tipX = bx + 6;
+    const tipY = by - 8;
+    kids.push(
+      s('path', { d: `M${bx} ${by} Q${bx} ${by - 14} ${tipX} ${tipY}`, stroke: '#9A9A3A', 'stroke-width': 1.6, fill: 'none' }),
+      leaf(bx, by - 4, 6, 160, '#C9B24A'),
+      leaf(bx, by - 7, 5.5, 20, '#D9C25A'),
+      // the head hangs down, petals faded
+      flowerHead(tipX, tipY + 2, 4, ['#F6E7B0', '#C9A23F'], 160, 5),
+    );
+  } else {
+    kids.push(
+      s('path', { d: `M${bx} ${by} Q${bx - 3} ${by - 5} ${bx - 9} ${by - 1}`, stroke: '#6E5137', 'stroke-width': 1.5, fill: 'none' }),
+      leaf(bx, by - 1, 5, 175, '#7A5A40'),
+      leaf(bx, by - 1, 4.5, 10, '#8C6A4C'),
+      s('circle', { cx: bx - 9.5, cy: by - 0.5, r: 2, fill: '#8C6A4C' }),
+    );
+  }
+  return s('g', { class: `plant plant-${h}` }, kids);
 }
 
 // ---------- gnomes ----------
@@ -135,46 +194,77 @@ export function gnome(look: GnomeLook, size: number, label: string): SVGSVGEleme
   ]);
 }
 
-export type Chore = 'water' | 'dig' | 'carry';
+export type Chore = 'water' | 'hoe' | 'plant' | 'weed';
 
-/** A small background gnome doing a chore. Animation comes from CSS classes, so reduce-motion can stop it. */
-function choreGnome(chore: Chore, hat: string, tunic: string): SVGGElement {
-  const tool: SVGElement[] =
-    chore === 'water'
-      ? [
-          s('rect', { x: 14, y: 15, width: 7, height: 5, rx: 1.5, fill: '#8FC2E8' }),
-          s('path', { d: 'M21 16 L25 13', stroke: '#8FC2E8', 'stroke-width': 1.5, 'stroke-linecap': 'round' }),
-          s('circle', { class: 'drip', cx: 25.5, cy: 15, r: 1, fill: '#9FD3FF' }),
-          s('circle', { class: 'drip drip-late', cx: 24.5, cy: 15, r: 1, fill: '#9FD3FF' }),
-        ]
-      : chore === 'dig'
-        ? [
-            s('g', { class: 'dig' }, [s('path', { d: 'M15 6 L21 23', stroke: '#C9B48A', 'stroke-width': 1.6, 'stroke-linecap': 'round' }), s('path', { d: 'M19 21 l5 1 -1 5 -4 -1z', fill: '#A9BCA8' })]),
-            s('path', { d: 'M20 27 q3 -4 7 0z', fill: '#5A3B26' }),
-            s('g', { class: 'grow' }, [s('path', { d: 'M23 25 v-4', stroke: '#5FB36A', 'stroke-width': 1.2 }), s('circle', { cx: 23, cy: 20.5, r: 1.8, fill: '#9BE3A5' })]),
-          ]
-        : [
-            s('path', { d: 'M14 13 v-6', stroke: '#5FB36A', 'stroke-width': 1.2 }),
-            s('circle', { cx: 14, cy: 6, r: 2.4, fill: '#9BE3A5' }),
-            s('circle', { cx: 16, cy: 8, r: 1.8, fill: '#FFD3E3' }),
-            s('rect', { x: 11.5, y: 13, width: 5, height: 4, rx: 1, fill: '#A9744A' }),
-          ];
-  return s('g', { class: 'bob' }, [
+function gnomeBody(hat: string, tunic: string, kneel = false): SVGElement[] {
+  const dy = kneel ? 3 : 0;
+  return [
     s('ellipse', { cx: 10, cy: 27, rx: 7, ry: 1.6, fill: 'rgba(0,0,0,.3)' }),
-    s('rect', { x: 6, y: 24, width: 3, height: 3, rx: 1, fill: '#4A3324' }),
-    s('rect', { x: 11, y: 24, width: 3, height: 3, rx: 1, fill: '#4A3324' }),
-    s('ellipse', { cx: 10, cy: 20, rx: 5.5, ry: 5.5, fill: tunic }),
-    s('path', { d: 'M5 13 Q10 24 15 13 Q13 16 10 16 Q7 16 5 13Z', fill: '#F4F1EA' }),
-    s('circle', { cx: 10, cy: 11.5, r: 4, fill: '#F2C9A0' }),
-    s('path', { d: 'M10 0 L16 9.5 Q10 11 4 9.5Z', fill: hat }),
-    ...tool,
+    kneel ? s('ellipse', { cx: 10, cy: 25.5, rx: 6, ry: 2, fill: '#4A3324' }) : s('rect', { x: 6, y: 24, width: 3, height: 3, rx: 1, fill: '#4A3324' }),
+    kneel ? s('g') : s('rect', { x: 11, y: 24, width: 3, height: 3, rx: 1, fill: '#4A3324' }),
+    s('ellipse', { cx: 10, cy: 20 + dy * 0.6, rx: 5.5, ry: 5.5 - dy * 0.3, fill: tunic }),
+    s('path', { d: `M5 ${13 + dy} Q10 ${24 + dy} 15 ${13 + dy} Q13 ${16 + dy} 10 ${16 + dy} Q7 ${16 + dy} 5 ${13 + dy}Z`, fill: '#F4F1EA' }),
+    s('circle', { cx: 10, cy: 11.5 + dy, r: 4, fill: '#F2C9A0' }),
+    s('path', { d: `M10 ${dy} L16 ${9.5 + dy} Q10 ${11 + dy} 4 ${9.5 + dy}Z`, fill: hat }),
+  ];
+}
+
+/** A small background gnome, always mid-chore. Motion is CSS (classes below), so reduce-motion stops it. */
+function choreGnome(chore: Chore, hat: string, tunic: string): SVGGElement {
+  if (chore === 'water') {
+    return s('g', {}, [
+      ...gnomeBody(hat, tunic),
+      s('g', { class: 'pour' }, [
+        s('rect', { x: 13, y: 15, width: 8, height: 6, rx: 1.6, fill: '#8FC2E8' }),
+        s('path', { d: 'M14 15 Q17 11 20 15', stroke: '#6FA6D0', 'stroke-width': 1, fill: 'none' }),
+        s('path', { d: 'M21 17 L26 13.5', stroke: '#8FC2E8', 'stroke-width': 1.6, 'stroke-linecap': 'round' }),
+      ]),
+      s('circle', { class: 'drop', cx: 26.5, cy: 15, r: 0.9, fill: '#9FD3FF' }),
+      s('circle', { class: 'drop late', cx: 27.5, cy: 15, r: 0.9, fill: '#9FD3FF' }),
+      s('circle', { class: 'drop later', cx: 26, cy: 15, r: 0.9, fill: '#9FD3FF' }),
+    ]);
+  }
+  if (chore === 'hoe') {
+    return s('g', {}, [
+      s('g', { class: 'puff' }, [s('circle', { cx: 24, cy: 26, r: 1.6, fill: '#8C6A4C' }), s('circle', { cx: 26.5, cy: 25, r: 1.2, fill: '#A9744A' }), s('circle', { cx: 22, cy: 25, r: 1, fill: '#A9744A' })]),
+      ...gnomeBody(hat, tunic),
+      s('g', { class: 'hoe' }, [
+        s('path', { d: 'M13 17 L25 25', stroke: '#C9A26E', 'stroke-width': 1.5, 'stroke-linecap': 'round' }),
+        s('path', { d: 'M24 24.5 l3 -2.5 l1 1.5 l-2.5 2.6z', fill: '#9AA5A0' }),
+        s('circle', { cx: 13.5, cy: 17.5, r: 1.6, fill: '#F2C9A0' }),
+      ]),
+    ]);
+  }
+  if (chore === 'plant') {
+    return s('g', {}, [
+      s('path', { d: 'M19 27 q4 -3.5 8 0z', fill: '#5A3B26' }),
+      s('g', { class: 'sprout' }, [
+        s('path', { d: 'M23 26 v-5', stroke: '#4FA35B', 'stroke-width': 1.1 }),
+        leaf(23, 22.5, 3.2, -150, '#7FCB88'),
+        leaf(23, 21.5, 3.4, -30, '#4FA35B'),
+      ]),
+      ...gnomeBody(hat, tunic, true),
+      s('g', { class: 'reach' }, [
+        s('rect', { x: 15.5, y: 18, width: 5, height: 4, rx: 1, fill: '#A9744A' }),
+        s('path', { d: 'M18 18 v-3', stroke: '#4FA35B', 'stroke-width': 1 }),
+        s('circle', { cx: 18, cy: 14.5, r: 1.5, fill: '#9BE3A5' }),
+      ]),
+    ]);
+  }
+  // weed: tugging a weed out of the plot and tossing it into a basket
+  return s('g', {}, [
+    s('path', { d: 'M-6 22 h7 l-1 5 h-5z', fill: '#B58A55' }),
+    s('path', { d: 'M-6 22 q3.5 -3 7 0', stroke: '#8C6A3C', 'stroke-width': 0.8, fill: 'none' }),
+    s('g', { class: 'tug' }, [...gnomeBody(hat, tunic)]),
+    s('g', { class: 'weed' }, [s('path', { d: 'M17 26 v-5', stroke: '#6E8B3D', 'stroke-width': 1 }), leaf(17, 23, 3, -140, '#8BA04A'), leaf(17, 22, 3, -40, '#8BA04A'), s('circle', { cx: 17, cy: 27, r: 1.2, fill: '#5A3B26' })]),
   ]);
 }
 
-export const CHORE_CREW: { chore: Chore; hat: string; tunic: string; walk: boolean }[] = [
-  { chore: 'water', hat: '#F2A23A', tunic: '#6A8FD0', walk: false },
-  { chore: 'dig', hat: '#B07BE0', tunic: '#C9763A', walk: false },
-  { chore: 'carry', hat: '#5FB36A', tunic: '#D9584B', walk: true },
+export const CHORE_CREW: { chore: Chore; hat: string; tunic: string }[] = [
+  { chore: 'water', hat: '#F2A23A', tunic: '#6A8FD0' },
+  { chore: 'hoe', hat: '#B07BE0', tunic: '#C9763A' },
+  { chore: 'plant', hat: '#5FB36A', tunic: '#D9584B' },
+  { chore: 'weed', hat: '#E2574C', tunic: '#5FA06A' },
 ];
 
 // ---------- the island ----------
@@ -224,7 +314,7 @@ export function island(decks: readonly Deck[], cards: readonly Card[], today: nu
     const gap = (bedSize - 16) / Math.max(1, per - 1);
     const placed = bedCards.map((c, i) => ({ c, x: spot.x0 + 8 + (i % per) * gap, y: spot.y0 + 8 + Math.floor(i / per) * gap }));
     placed.sort((a, b) => a.x + a.y - (b.x + b.y));
-    for (const p of placed) add(bed, isoPlant(defs, p.x, p.y, bedHeight, health(p.c.srs, today)));
+    for (const p of placed) add(bed, isoPlant(p.x, p.y, bedHeight, health(p.c.srs, today), p.c.id));
     bed.addEventListener('click', () => onBed(spot.deck.id));
     bed.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
@@ -235,12 +325,22 @@ export function island(decks: readonly Deck[], cards: readonly Card[], today: nu
     add(world, bed);
   }
 
-  const spotsForChores: Pt[] = [P(maxX - 30, maxY - 150, 0), P(minX + 34, minY + 34, 8), P(maxX - 140, maxY - 24, 0)];
+  // Each gnome works right beside soil: the first beds, then the two neighbors' plots.
+  const first = spots[0];
+  const last = spots[Math.min(spots.length, ISLAND.perRow) - 1];
+  // [where, mirrored]: mirrored gnomes face left, so the waterer pours into the bed beside it.
+  const jobs: [Pt, boolean][] = [
+    [last ? P(last.x0 + bedSize + 16, last.y0 + bedSize * 0.55, 0) : P(maxX - 40, maxY - 120, 0), true],
+    [first ? P(first.x0 + 2, first.y0 + bedSize + 8, 0) : P(minX + 60, maxY - 40, 0), false],
+    [P(minX + 34, minY + 50, 8), false],
+    [P(maxX - 44, maxY - 4, 0), false],
+  ];
   CHORE_CREW.forEach((c, i) => {
-    const at = spotsForChores[i];
-    if (!at) return;
-    const inner = s('g', c.walk ? { class: 'walk' } : {}, [choreGnome(c.chore, c.hat, c.tunic)]);
-    add(world, s('g', { transform: `translate(${(at[0] - 13).toFixed(1)},${(at[1] - 34).toFixed(1)}) scale(1.3)`, 'aria-hidden': 'true' }, [inner]));
+    const job = jobs[i];
+    if (!job) return;
+    const [[x, y], mirror] = job;
+    const place = mirror ? `translate(${(x + 13).toFixed(1)},${(y - 34).toFixed(1)}) scale(-1.3,1.3)` : `translate(${(x - 13).toFixed(1)},${(y - 34).toFixed(1)}) scale(1.3)`;
+    add(world, s('g', { transform: place, 'aria-hidden': 'true' }, [choreGnome(c.chore, c.hat, c.tunic)]));
   });
 
   const corners = [P(minX, minY, 0), P(maxX, minY, 0), P(maxX, maxY, -40), P(minX, maxY, -40), P(minX, minY, 30)];
