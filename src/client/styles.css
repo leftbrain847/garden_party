@@ -108,20 +108,31 @@ button:focus-visible, .bed:focus-visible, .snap-btn:focus-visible { outline: 3px
 @keyframes tug { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(1.2px); } 55% { transform: translateY(-1.5px); } }
 @keyframes weed { 0%, 50% { transform: translate(0, 0) rotate(0); opacity: 1; } 75% { transform: translate(-10px, -8px) rotate(-200deg); opacity: 1; } 90%, 100% { transform: translate(-18px, -1px) rotate(-320deg); opacity: 0; } }
 @keyframes sway { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(2deg); } }
-.pour { transform-box: fill-box; transform-origin: 10% 90%; animation: pour 2.4s ease-in-out infinite; }
-.drop { animation: drop 2.4s linear infinite; }
-.drop.late { animation-delay: 0.25s; }
-.drop.later { animation-delay: 0.5s; }
-.hoe { transform-box: view-box; transform-origin: 13.5px 17.5px; animation: hoe 1.4s ease-in infinite; }
-.puff { transform-box: fill-box; transform-origin: center; animation: puff 1.4s ease-out infinite; }
-.reach { animation: reach 2.6s ease-in-out infinite; }
-.sprout { transform-box: fill-box; transform-origin: bottom center; animation: sprout 2.6s ease-out infinite; }
-.tug { animation: tug 2s ease-in-out infinite; }
-.weed { transform-box: fill-box; transform-origin: bottom center; animation: weed 2s ease-in infinite; }
+@keyframes stride { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.6px); } }
+/* Tools only move while a gnome is working; walking gnomes bob along. */
+.crew .pour { transform-box: fill-box; transform-origin: 10% 90%; }
+.crew .hoe { transform-box: view-box; transform-origin: 13.5px 17.5px; transform: rotate(-55deg); }
+.crew .drop, .crew .puff { opacity: 0; }
+.crew .sprout { transform-box: fill-box; transform-origin: bottom center; transform: scale(0); }
+.crew .weed { opacity: 0; }
+.crew.walking .stride { animation: stride 0.42s ease-in-out infinite; }
+.crew.working .pour { animation: pour 2.4s ease-in-out infinite; }
+.crew.working .drop { animation: drop 2.4s linear infinite; }
+.crew.working .drop.late { animation-delay: 0.25s; }
+.crew.working .drop.later { animation-delay: 0.5s; }
+.crew.working .hoe { animation: hoe 1.4s ease-in infinite; }
+.crew.working .puff { transform-box: fill-box; transform-origin: center; animation: puff 1.4s ease-out infinite; }
+.crew.working .reach { animation: reach 2.6s ease-in-out infinite; }
+.crew.working .sprout { animation: sprout 2.6s ease-out infinite; }
+.crew.working .tug { animation: tug 2s ease-in-out infinite; }
+.crew.working .weed { opacity: 1; transform-box: fill-box; transform-origin: bottom center; animation: weed 2s ease-in infinite; }
 .plant-bloom, .plant-ok { transform-box: fill-box; transform-origin: bottom center; animation: sway 3.2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
-  .pour, .drop, .hoe, .puff, .reach, .sprout, .tug, .weed, .plant-bloom, .plant-ok { animation: none; }
-  .drop, .puff { opacity: 0; }
+  .crew .stride, .crew .pour, .crew .drop, .crew .hoe, .crew .puff, .crew .reach, .crew .sprout, .crew .tug, .crew .weed, .plant-bloom, .plant-ok { animation: none; }
+  /* Still gnomes hold a working pose: can tipped, hoe down, seedling up. */
+  .crew.working .pour { transform: rotate(22deg); }
+  .crew.working .hoe { transform: rotate(0deg); }
+  .crew.working .sprout { transform: scale(1); }
 }
 
 /* ---------- lists ---------- */

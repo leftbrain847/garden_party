@@ -3,6 +3,7 @@
  * the seeds. Colors and sizes are config objects at the top.
  */
 import { health, needsWater, type Card, type Deck, type Health } from '../app';
+import type { Chore, Site } from '../crew';
 
 // The SVG namespace is an identifier, never fetched. It's assembled from parts only because the Play build's
 // no-network tripwire matches the literal scheme prefix; flagged in the PR so a reviewer sees why.
@@ -60,8 +61,8 @@ function radial(light: string, dark: string): { def: SVGRadialGradientElement; u
 
 // ---------- isometric projection ----------
 
-type Pt = [number, number];
-const P = (x: number, y: number, z: number): Pt => [(x - y) * 0.866, (x + y) * 0.5 - z];
+export type Pt = [number, number];
+export const P = (x: number, y: number, z: number): Pt => [(x - y) * 0.866, (x + y) * 0.5 - z];
 const pts = (list: Pt[]): string => list.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
 
 function box(x0: number, y0: number, z0: number, w: number, d: number, h: number, top: string, left: string, right: string): SVGGElement {
@@ -194,11 +195,10 @@ export function gnome(look: GnomeLook, size: number, label: string): SVGSVGEleme
   ]);
 }
 
-export type Chore = 'water' | 'hoe' | 'plant' | 'weed';
 
 function gnomeBody(hat: string, tunic: string, kneel = false): SVGElement[] {
   const dy = kneel ? 3 : 0;
-  return [
+  return [s('g', { class: 'stride' }, [
     s('ellipse', { cx: 10, cy: 27, rx: 7, ry: 1.6, fill: 'rgba(0,0,0,.3)' }),
     kneel ? s('ellipse', { cx: 10, cy: 25.5, rx: 6, ry: 2, fill: '#4A3324' }) : s('rect', { x: 6, y: 24, width: 3, height: 3, rx: 1, fill: '#4A3324' }),
     kneel ? s('g') : s('rect', { x: 11, y: 24, width: 3, height: 3, rx: 1, fill: '#4A3324' }),
@@ -206,11 +206,11 @@ function gnomeBody(hat: string, tunic: string, kneel = false): SVGElement[] {
     s('path', { d: `M5 ${13 + dy} Q10 ${24 + dy} 15 ${13 + dy} Q13 ${16 + dy} 10 ${16 + dy} Q7 ${16 + dy} 5 ${13 + dy}Z`, fill: '#F4F1EA' }),
     s('circle', { cx: 10, cy: 11.5 + dy, r: 4, fill: '#F2C9A0' }),
     s('path', { d: `M10 ${dy} L16 ${9.5 + dy} Q10 ${11 + dy} 4 ${9.5 + dy}Z`, fill: hat }),
-  ];
+  ])];
 }
 
 /** A small background gnome, always mid-chore. Motion is CSS (classes below), so reduce-motion stops it. */
-function choreGnome(chore: Chore, hat: string, tunic: string): SVGGElement {
+export function choreGnome(chore: Chore, hat: string, tunic: string): SVGGElement {
   if (chore === 'water') {
     return s('g', {}, [
       ...gnomeBody(hat, tunic),
@@ -253,8 +253,6 @@ function choreGnome(chore: Chore, hat: string, tunic: string): SVGGElement {
   }
   // weed: tugging a weed out of the plot and tossing it into a basket
   return s('g', {}, [
-    s('path', { d: 'M-6 22 h7 l-1 5 h-5z', fill: '#B58A55' }),
-    s('path', { d: 'M-6 22 q3.5 -3 7 0', stroke: '#8C6A3C', 'stroke-width': 0.8, fill: 'none' }),
     s('g', { class: 'tug' }, [...gnomeBody(hat, tunic)]),
     s('g', { class: 'weed' }, [s('path', { d: 'M17 26 v-5', stroke: '#6E8B3D', 'stroke-width': 1 }), leaf(17, 23, 3, -140, '#8BA04A'), leaf(17, 22, 3, -40, '#8BA04A'), s('circle', { cx: 17, cy: 27, r: 1.2, fill: '#5A3B26' })]),
   ]);
@@ -287,7 +285,19 @@ export function layoutBeds(decks: readonly Deck[]): BedSpot[] {
   });
 }
 
-export function island(decks: readonly Deck[], cards: readonly Card[], today: number, onBed: (deckId: string) => void): SVGSVGElement {
+export interface Stage {
+  svg: SVGSVGElement;
+  /** Beds and plots the crew can work, in ground coordinates. */
+  sites: Site[];
+  /** Per site: the group its plants (and any gnome standing in it) live in, painted back to front. */
+  layers: Map<string, SVGGElement>;
+  /** Gnomes on the ground draw here, in front of every bed (the crew only walks in front of the beds). */
+  front: SVGGElement;
+}
+
+export const PLOT = { size: 38, height: 8, inset: 14, sprouts: 4 };
+
+export function island(decks: readonly Deck[], cards: readonly Card[], today: number, onBed: (deckId: string) => void): Stage {
   const { bedSize, bedHeight, margin, maxPlants } = ISLAND;
   const spots = layoutBeds(decks);
   const minX = Math.min(0, ...spots.map((b) => b.x0 - margin));
@@ -296,16 +306,23 @@ export function island(decks: readonly Deck[], cards: readonly Card[], today: nu
   const maxY = 260;
   const defs = s('defs');
   const world = s('g');
+  const sites: Site[] = [];
+  const layers = new Map<string, SVGGElement>();
   add(
     world,
     box(minX, minY, -40, maxX - minX, maxY - minY, 34, EARTH.soilLeft, EARTH.soilLeft, EARTH.soilRight),
     box(minX, minY, -6, maxX - minX, maxY - minY, 6, EARTH.grassTop, EARTH.grassLeft, EARTH.grassRight),
-    // two neighbors' little plots, where the chore gnomes work
-    box(minX + 14, minY + 14, 0, 40, 40, 8, EARTH.plotTop, EARTH.plotLeft, EARTH.plotRight),
-    box(maxX - 52, maxY - 52, 0, 38, 38, 8, EARTH.plotTop, EARTH.plotLeft, EARTH.plotRight),
   );
 
-  for (const spot of spots) {
+  // A neighbor's plot out front, where the planter sows seedlings.
+  const plot = { x0: maxX - PLOT.size - PLOT.inset, y0: maxY - PLOT.size - PLOT.inset };
+  const plotLayer = s('g');
+  add(world, box(plot.x0, plot.y0, 0, PLOT.size, PLOT.size, PLOT.height, EARTH.plotTop, EARTH.plotLeft, EARTH.plotRight), plotLayer);
+  const plotCells = Array.from({ length: PLOT.sprouts }, (_, i) => ({ x: plot.x0 + 10 + (i % 2) * 18, y: plot.y0 + 10 + Math.floor(i / 2) * 18, health: null }));
+  sites.push({ id: 'plot', kind: 'plot', x0: plot.x0, y0: plot.y0, w: PLOT.size, d: PLOT.size, h: PLOT.height, cells: plotCells });
+  layers.set('plot', plotLayer);
+
+  spots.forEach((spot, k) => {
     const bedCards = cards.filter((c) => c.deckId === spot.deck.id).slice(0, maxPlants);
     const due = cards.filter((c) => c.deckId === spot.deck.id && needsWater(c.srs, today)).length;
     const bed = s('g', { class: 'bed', role: 'button', tabindex: 0, 'aria-label': `${spot.deck.name}: ${due} to water` });
@@ -314,7 +331,13 @@ export function island(decks: readonly Deck[], cards: readonly Card[], today: nu
     const gap = (bedSize - 16) / Math.max(1, per - 1);
     const placed = bedCards.map((c, i) => ({ c, x: spot.x0 + 8 + (i % per) * gap, y: spot.y0 + 8 + Math.floor(i / per) * gap }));
     placed.sort((a, b) => a.x + a.y - (b.x + b.y));
-    for (const p of placed) add(bed, isoPlant(p.x, p.y, bedHeight, health(p.c.srs, today), p.c.id));
+    const plants = s('g');
+    for (const p of placed) {
+      const el = isoPlant(p.x, p.y, bedHeight, health(p.c.srs, today), p.c.id);
+      el.setAttribute('data-depth', String(p.x + p.y));
+      add(plants, el);
+    }
+    add(bed, plants);
     bed.addEventListener('click', () => onBed(spot.deck.id));
     bed.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
@@ -323,32 +346,24 @@ export function island(decks: readonly Deck[], cards: readonly Card[], today: nu
       }
     });
     add(world, bed);
-  }
-
-  // Each gnome works right beside soil: the first beds, then the two neighbors' plots.
-  const first = spots[0];
-  const last = spots[Math.min(spots.length, ISLAND.perRow) - 1];
-  // [where, mirrored]: mirrored gnomes face left, so the waterer pours into the bed beside it.
-  const jobs: [Pt, boolean][] = [
-    [last ? P(last.x0 + bedSize + 16, last.y0 + bedSize * 0.55, 0) : P(maxX - 40, maxY - 120, 0), true],
-    [first ? P(first.x0 + 2, first.y0 + bedSize + 8, 0) : P(minX + 60, maxY - 40, 0), false],
-    [P(minX + 34, minY + 50, 8), false],
-    [P(maxX - 44, maxY - 4, 0), false],
-  ];
-  CHORE_CREW.forEach((c, i) => {
-    const job = jobs[i];
-    if (!job) return;
-    const [[x, y], mirror] = job;
-    const place = mirror ? `translate(${(x + 13).toFixed(1)},${(y - 34).toFixed(1)}) scale(-1.3,1.3)` : `translate(${(x - 13).toFixed(1)},${(y - 34).toFixed(1)}) scale(1.3)`;
-    add(world, s('g', { transform: place, 'aria-hidden': 'true' }, [choreGnome(c.chore, c.hat, c.tunic)]));
+    // Only the front row is reachable along the front path; beds further back are left to the gnomes' imagination.
+    if (k < ISLAND.perRow) {
+      const id = `bed:${spot.deck.id}`;
+      sites.push({ id, kind: 'bed', x0: spot.x0, y0: spot.y0, w: bedSize, d: bedSize, h: bedHeight, cells: placed.map((p) => ({ x: p.x, y: p.y, health: health(p.c.srs, today) })) });
+      layers.set(id, plants);
+    }
   });
+
+  const front = s('g', { 'aria-hidden': 'true' });
+  add(world, front);
 
   const corners = [P(minX, minY, 0), P(maxX, minY, 0), P(maxX, maxY, -40), P(minX, maxY, -40), P(minX, minY, 30)];
   const vx = Math.min(...corners.map((c) => c[0])) - 4;
   const vy = Math.min(...corners.map((c) => c[1])) - 10;
   const vw = Math.max(...corners.map((c) => c[0])) + 4 - vx;
   const vh = Math.max(...corners.map((c) => c[1])) + 4 - vy;
-  return s('svg', { class: 'island', viewBox: `${vx.toFixed(0)} ${vy.toFixed(0)} ${vw.toFixed(0)} ${vh.toFixed(0)}`, role: 'group', 'aria-label': 'Your garden island' }, [defs, world]);
+  const svg = s('svg', { class: 'island', viewBox: `${vx.toFixed(0)} ${vy.toFixed(0)} ${vw.toFixed(0)} ${vh.toFixed(0)}`, role: 'group', 'aria-label': 'Your garden island' }, [defs, world]);
+  return { svg, sites, layers, front };
 }
 
 // ---------- flat plant for the bed view ----------

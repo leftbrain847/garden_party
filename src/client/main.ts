@@ -7,6 +7,7 @@
 import config from '../../app.config.json';
 import { BETS, health, newSrs, queue, tally, water, type Bet, type Card, type Face, type Health } from '../app';
 import { cameraIcon, CREW, gnome, island, plant, PLANT_COLORS, seeds } from './art';
+import { startCrew } from './crew-view';
 import { load, newId, save, today, type Garden, type SaveResult } from './store';
 
 // ---------- tiny DOM helper (text only, never HTML) ----------
@@ -72,6 +73,8 @@ interface Draft {
 const garden: Garden = load();
 let screen: Screen = { name: 'garden' };
 let lastSave: SaveResult = 'saved';
+/** Stops the island's gnome crew; replaced each time the garden is drawn. */
+let stopCrew: () => void = () => undefined;
 
 function commit(): void {
   lastSave = save(garden);
@@ -126,10 +129,12 @@ function gardenScreen(): Kid[] {
   const due = queue(garden.cards, day);
   const byBed = garden.decks.map((d) => ({ d, n: due.filter((c) => c.deckId === d.id).length })).sort((a, b) => b.n - a.n);
   const worst = byBed[0];
+  const stage = island(garden.decks, garden.cards, day, (id) => go({ name: 'bed', deckId: id }));
+  stopCrew = startCrew(stage);
   const pipLine = garden.decks.length === 0 ? LINES.pipEmpty : !worst || worst.n === 0 ? LINES.pipAllWatered : LINES.pipThirsty(worst.d.name, worst.n);
   return [
     top('Garden · review', 'Your garden', `${healthLine(garden.cards) || 'No plants yet'} · ${garden.seeds} seeds`),
-    h('div', { cls: 'island-wrap' }, [island(garden.decks, garden.cards, day, (id) => go({ name: 'bed', deckId: id }))]),
+    h('div', { cls: 'island-wrap' }, [stage.svg]),
     speech('pip', pipLine),
     due.length > 0 ? button(`Water all ${due.length} →`, 'cta', () => startReview()) : null,
     garden.decks.length > 0 ? h('p', { cls: 'hint', text: 'Or tap a bed to water just that one' }) : null,
@@ -439,6 +444,8 @@ function cardScreen(c: Extract<Screen, { name: 'card' }>): Kid[] {
 // ---------- draw ----------
 
 function draw(): void {
+  stopCrew();
+  stopCrew = () => undefined;
   const s = screen;
   const body =
     s.name === 'garden' ? gardenScreen()
