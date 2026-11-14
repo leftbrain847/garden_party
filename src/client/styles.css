@@ -235,3 +235,5 @@ textarea.field { resize: vertical; min-height: 76px; line-height: 1.4; }
 .side-shed .tab.on { background: #2e3658; }
 .side-shed .row { background: linear-gradient(180deg, #2e3658, #222944); box-shadow: 0 5px 0 #11152a, 0 10px 16px rgba(0, 0, 0, 0.3); }
 .small-ghost { min-height: 44px; font-size: 14px; }
+.sign-text { font-family: var(--display); letter-spacing: 0.01em; }
+.bed:hover .sign rect:nth-child(3), .bed:focus .sign rect:nth-child(3) { fill: #A9744A; }

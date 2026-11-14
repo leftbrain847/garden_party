@@ -297,6 +297,33 @@ export interface Stage {
 
 export const PLOT = { size: 38, height: 8, inset: 14, sprouts: 4 };
 
+/** The wooden name sign staked at each bed's front corner. */
+export const SIGN = { fontSize: 10, maxChars: 16, charWidth: 6.3, pad: 7, height: 17, drop: 5, post: 6 };
+
+function bedSign(name: string, due: number, at: Pt): SVGGElement {
+  const label = name.length > SIGN.maxChars ? `${name.slice(0, SIGN.maxChars - 1)}…` : name;
+  const w = Math.max(40, label.length * SIGN.charWidth + SIGN.pad * 2 + (due > 0 ? 18 : 0));
+  const [cx, cy] = at;
+  const x = cx - w / 2;
+  const y = cy + SIGN.drop;
+  const text = s('text', { x: x + SIGN.pad, y: y + SIGN.height / 2 + SIGN.fontSize * 0.36, 'font-size': SIGN.fontSize, 'font-weight': 700, fill: '#FFF6E3', class: 'sign-text' });
+  text.textContent = label;
+  const kids: SVGElement[] = [
+    s('rect', { x: cx - 1.5, y: y + SIGN.height - 2, width: 3, height: SIGN.post + 2, fill: '#6B4A33' }),
+    s('rect', { x, y: y + 2, width: w, height: SIGN.height, rx: 4, fill: '#5A3B26' }),
+    s('rect', { x, y, width: w, height: SIGN.height, rx: 4, fill: '#8C5D3A', stroke: '#A9744A', 'stroke-width': 1 }),
+    text,
+  ];
+  if (due > 0) {
+    const bx = x + w - SIGN.pad - 6;
+    const by = y + SIGN.height / 2;
+    const n = s('text', { x: bx, y: by + 3.4, 'font-size': 9, 'font-weight': 800, fill: '#3A2A05', 'text-anchor': 'middle' });
+    n.textContent = due > 99 ? '99+' : String(due);
+    kids.push(s('circle', { cx: bx, cy: by, r: 6.5, fill: '#F2C95C' }), n);
+  }
+  return s('g', { class: 'sign', 'aria-hidden': 'true' }, kids);
+}
+
 export function island(decks: readonly Deck[], cards: readonly Card[], today: number, onBed: (deckId: string) => void): Stage {
   const { bedSize, bedHeight, margin, maxPlants } = ISLAND;
   const spots = layoutBeds(decks);
@@ -337,7 +364,7 @@ export function island(decks: readonly Deck[], cards: readonly Card[], today: nu
       el.setAttribute('data-depth', String(p.x + p.y));
       add(plants, el);
     }
-    add(bed, plants);
+    add(bed, plants, bedSign(spot.deck.name, due, P(spot.x0 + bedSize, spot.y0 + bedSize, 0)));
     bed.addEventListener('click', () => onBed(spot.deck.id));
     bed.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
@@ -361,7 +388,7 @@ export function island(decks: readonly Deck[], cards: readonly Card[], today: nu
   const vx = Math.min(...corners.map((c) => c[0])) - 4;
   const vy = Math.min(...corners.map((c) => c[1])) - 10;
   const vw = Math.max(...corners.map((c) => c[0])) + 4 - vx;
-  const vh = Math.max(...corners.map((c) => c[1])) + 4 - vy;
+  const vh = Math.max(...corners.map((c) => c[1]), ...spots.map((b) => P(b.x0 + bedSize, b.y0 + bedSize, 0)[1] + SIGN.drop + SIGN.height + SIGN.post)) + 4 - vy;
   const svg = s('svg', { class: 'island', viewBox: `${vx.toFixed(0)} ${vy.toFixed(0)} ${vw.toFixed(0)} ${vh.toFixed(0)}`, role: 'group', 'aria-label': 'Your garden island' }, [defs, world]);
   return { svg, sites, layers, front };
 }
